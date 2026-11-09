@@ -1,10 +1,18 @@
-# Busca IA
+# Busca IA (Busca_web_LLM)
 
-## Visão Geral
+Assistente de pesquisa conversacional: pesquisa na web em tempo real, sintetiza a resposta com um LLM e mostra as fontes citadas, com respostas em streaming.
 
-**Busca IA** é uma aplicação web inteligente que permite aos usuários fazer perguntas e receber respostas baseadas em pesquisa em tempo real na web. A aplicação combina busca na internet usando a API Tavily com geração de respostas via Groq (modelo LLaMA 3.3), oferecendo um assistente de pesquisa conversacional.
+> **EN:** Conversational research assistant. It searches the web in real time (Tavily), streams a synthesized answer from Llama 3.3 70B (Groq) and shows the cited sources with favicons and inline citations. Optional whitelist restricts searches to trusted domains.
 
-## Diagrama de Arquitetura e Fluxo
+## O que ele faz
+
+- **Busca web em tempo real** com Tavily, para respostas com informação atual.
+- **Respostas com fontes**: cada resposta mostra as fontes (título, domínio e favicon) e usa citações inline.
+- **Whitelist de domínios confiáveis**: opção para restringir a busca a sites de imprensa e esporte confiáveis. Se a busca restrita não retornar nada, o app faz fallback para busca aberta.
+- **Streaming** da resposta, com renderização de Markdown (negrito, listas, código).
+- **Controles na interface** para ligar e desligar a busca web e a whitelist.
+
+## Como funciona
 
 ```mermaid
 sequenceDiagram
@@ -14,125 +22,90 @@ sequenceDiagram
     participant T as Tavily API
     participant G as Groq API
 
-    U->>F: Digita pergunta e clica enviar
-    F->>B: POST /chat com pergunta
-    B->>B: Verifica se busca web ativada
-    alt Busca web ON
-        B->>T: Busca na web (com ou sem whitelist)
-        T-->>B: Retorna resultados
-        B->>B: Processa fontes (build_sources)
+    U->>F: Digita a pergunta
+    F->>B: POST /chat
+    alt Busca web ligada
+        B->>T: Busca (com ou sem whitelist)
+        T-->>B: Resultados
+        B->>B: Monta as fontes (build_sources)
     end
-    B->>B: Constrói prompt com fontes
-    B->>G: Envia prompt para streaming
-    G-->>B: Stream de resposta (chunks)
-    B-->>F: Stream de dados (sources + chunks)
-    F-->>U: Exibe fontes e resposta em tempo real
+    B->>B: Monta o prompt com as fontes
+    B->>G: Envia o prompt em streaming
+    G-->>B: Chunks da resposta
+    B-->>F: Stream (fontes + chunks)
+    F-->>U: Fontes e resposta em tempo real
 ```
 
-Este diagrama de sequência ilustra o fluxo principal da aplicação: desde a entrada do usuário até a exibição da resposta, destacando a integração com as APIs externas Tavily e Groq.
+### Decisões de projeto
 
-## Funcionalidades Principais
+- **Busca antes da geração (RAG simples).** Os snippets das fontes entram no prompt, então a resposta se apoia em conteúdo recente em vez de só no conhecimento do modelo.
+- **Fontes enviadas antes do texto.** O stream manda primeiro as fontes e depois os chunks, e a interface já mostra de onde a resposta vem enquanto ela é escrita.
+- **Fallback da whitelist.** Restringir domínios melhora a confiabilidade, mas pode zerar os resultados. Nesse caso a busca aberta assume.
 
-- **Busca Web em Tempo Real**: Pesquisa na web usando Tavily para obter informações atualizadas.
-- **Respostas Inteligentes**: Geração de respostas estruturadas em português brasileiro usando IA (Groq).
-- **Whitelist de Domínios Confiáveis**: Opção para restringir buscas a sites confiáveis (Globo, Folha, ESPN, etc.).
-- **Interface Conversacional**: Chat-like com streaming de respostas.
-- **Citações e Fontes**: Exibe fontes com ícones de favicon, títulos e domínios, com citações inline nas respostas.
-- **Renderização Markdown**: Respostas formatadas com suporte a negrito, listas, código, etc.
-- **Controles de Configuração**: Botões para ativar/desativar busca web e whitelist via interface.
+## Stack
 
-## Como Funciona
+| Camada | Tecnologia |
+|---|---|
+| Backend | Python, FastAPI, Uvicorn, httpx |
+| Busca web | Tavily |
+| LLM | Groq, modelo `llama-3.3-70b-versatile` (temperatura 0.7, até 1024 tokens) |
+| Frontend | HTML, CSS e JavaScript puro com templates Jinja2 |
 
-### Arquitetura
+## Como rodar
 
-A aplicação é construída com:
-- **Backend**: FastAPI (Python) para APIs REST e streaming.
-- **Frontend**: HTML/CSS/JavaScript puro com Jinja2 para templates.
-- **APIs Externas**:
-  - **Tavily**: Para busca web (até 1000 buscas/mês grátis).
-  - **Groq**: Para geração de respostas (modelo LLaMA 3.3-70b-versatile).
+```bash
+git clone https://github.com/igortavaresalves/Busca_web_LLM.git
+cd Busca_web_LLM
 
-### Fluxo de Funcionamento
+python -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
+pip install -r requirements.txt
 
-1. **Entrada do Usuário**: O usuário digita uma pergunta na interface web.
-2. **Busca Web (Opcional)**: Se a busca web estiver ativada, a aplicação consulta a API Tavily.
-   - Se whitelist estiver ativa, busca apenas em domínios confiáveis.
-   - Se a busca restrita não retornar resultados, faz fallback para busca aberta.
-3. **Construção do Prompt**: Monta um prompt para o Groq incluindo a pergunta e snippets das fontes encontradas.
-4. **Geração de Resposta**: Envia o prompt para Groq via streaming, exibindo a resposta em tempo real.
-5. **Exibição**: Mostra a resposta formatada, fontes citadas e links para as origens.
-
-### Endpoints da API
-
-- `GET /`: Página principal (interface web).
-- `POST /chat`: Envia pergunta e recebe resposta em streaming.
-- `POST /toggle_web`: Liga/desliga busca web.
-- `POST /toggle_whitelist`: Liga/desliga restrição de domínios.
-- `GET /whitelist`: Lista domínios confiáveis.
-- `GET /status`: Status da aplicação e configurações.
-
-### Configurações
-
-- **Chaves de API**: Configuradas diretamente no código (Groq e Tavily).
-- **Whitelist**: Lista de domínios confiáveis (editável no código).
-- **Modelo Groq**: LLaMA 3.3-70b-versatile.
-- **Parâmetros**: Temperatura 0.7, max_tokens 1024.
-
-## Instalação e Execução
-
-### Pré-requisitos
-
-- Python 3.8+
-- Chaves de API válidas para Groq e Tavily.
-
-### Passos
-
-1. **Clone o repositório** (ou baixe os arquivos):
-   ```
-   git clone <url-do-repo>
-   cd busca_web_llm
-   ```
-
-2. **Instale as dependências**:
-   ```
-   pip install -r requirements.txt
-   ```
-
-3. **Configure as chaves de API** no arquivo app.py:
-   - Substitua `GROQ_API_KEY` pela sua chave Groq.
-   - Substitua `TAVILY_API_KEY` pela sua chave Tavily.
-
-4. **Execute a aplicação**:
-   ```
-   uvicorn app:app --reload
-   ```
-
-5. **Acesse**: Abra `http://localhost:8000` no navegador.
-
-## Estrutura do Projeto
-
-```
-busca_web_llm/
-├── app.py                 # Backend FastAPI
-├── requirements.txt       # Dependências Python
-├── templates/
-│   └── index.html         # Interface web
-└── __pycache__/           # Cache Python (ignorado)
+cp env.example .env             # Windows: copy env.example .env
 ```
 
-## Tecnologias Utilizadas
+Preencha o `.env`:
 
-- **FastAPI**: Framework web assíncrono para Python.
-- **Uvicorn**: Servidor ASGI para FastAPI.
-- **Jinja2**: Templates HTML.
-- **Tavily Python**: Cliente para API de busca Tavily.
-- **httpx**: Cliente HTTP assíncrono.
-- **HTML/CSS/JS**: Frontend puro com renderização Markdown customizada.
+```
+GROQ_API_KEY=...      # https://console.groq.com
+TAVILY_API_KEY=...    # https://app.tavily.com (1.000 buscas por mês no plano gratuito)
+```
 
-## Licença
+Suba o servidor e acesse http://localhost:8000:
 
-Este projeto é de código aberto. Consulte o arquivo LICENSE para detalhes.
+```bash
+uvicorn app:app --reload
+```
 
----
+## Endpoints
 
-**Desenvolvido com ❤️ usando FastAPI, Groq e Tavily.**
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/` | Interface web |
+| `POST` | `/chat` | Pergunta e resposta em streaming, com fontes |
+| `POST` | `/toggle_web` | Liga ou desliga a busca web |
+| `POST` | `/toggle_whitelist` | Liga ou desliga a restrição de domínios |
+| `GET` | `/whitelist` | Lista os domínios confiáveis |
+| `GET` | `/status` | Estado da aplicação e das chaves configuradas |
+
+## Estrutura
+
+```
+Busca_web_LLM/
+├── app.py                # backend FastAPI
+├── requirements.txt
+├── env.example           # modelo de variáveis de ambiente
+└── templates/
+    └── index.html        # interface web
+```
+
+## Limitações e próximos passos
+
+- Os interruptores de busca web e whitelist são globais no servidor: mover o estado para a sessão do usuário.
+- Sem memória de conversa: enviar o histórico ao modelo para perguntas de acompanhamento.
+- Sem testes automatizados: cobrir `build_sources` e o fallback da whitelist.
+- Containerizar com Docker para facilitar a execução.
+
+## Autor
+
+Igor Tavares, desenvolvedor backend e de soluções com IA, Recife (PE). [GitHub](https://github.com/igortavaresalves)
