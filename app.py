@@ -10,19 +10,24 @@ from urllib.parse import urlparse
 
 import httpx
 from tavily import TavilyClient
+import os
+
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
+load_dotenv()
+
 # ── Configuração ──────────────────────────────────────────────────────────────
 
 # Groq: API Keys
-GROQ_API_KEY = "SUA_CHAVE_GROQ"  # Substitua pela sua chave da Groq
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")  # definida no .env ou no ambiente
 GROQ_MODEL   = "llama-3.3-70b-versatile"
 GROQ_URL     = "https://api.groq.com/openai/v1/chat/completions"
 
 # Tavily: API Keys (1.000 buscas/mês grátis)
-TAVILY_API_KEY = "SUA_CHAVE_TAVILY"  # Substitua pela sua chave da Tavily
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")  # definida no .env ou no ambiente
 
 # ── Whitelist de domínios confiáveis ──────────────────────────────────────────
 # Quando USE_WHITELIST=True, Tavily só retorna resultados destes sites.
@@ -282,8 +287,8 @@ async def status():
         "whitelist_enabled": use_whitelist,
         "trusted_domains": TRUSTED_DOMAINS,
         "groq_model": GROQ_MODEL,
-        "groq_key_set": GROQ_API_KEY != "SUA_CHAVE_GROQ_AQUI",
-        "tavily_key_set": TAVILY_API_KEY != "SUA_CHAVE_TAVILY_AQUI",
+        "groq_key_set": bool(GROQ_API_KEY),
+        "tavily_key_set": bool(TAVILY_API_KEY),
     }
 
 
