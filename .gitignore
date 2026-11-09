@@ -1,0 +1,16 @@
+# Ambientes virtuais e dependencias
+venv/
+.venv/
+env/
+
+# Cache e build
+__pycache__/
+*.pyc
+
+# Segredos e configuracao local
+.env
+
+# Editor e sistema
+.vscode/
+.idea/
+.DS_Store
